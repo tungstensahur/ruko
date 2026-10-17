@@ -3,5 +3,6 @@ services:
     name: ruko
     runtime: node
     plan: free
-    buildCommand: "true"
+    rootDir: ruko-online
+    buildCommand: npm install
     startCommand: node server.js
