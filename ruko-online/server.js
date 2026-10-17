@@ -1,3 +1,4 @@
+console.log("=== RUKO SERVER STARTING ===");
 // Ruko server: accounts, shared hats/games, sales, live game servers. No dependencies.
 const http = require('http'), fs = require('fs'), path = require('path'), crypto = require('crypto');
 const PORT = process.env.PORT || 3000;
