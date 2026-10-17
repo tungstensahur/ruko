@@ -38,7 +38,7 @@ h2{margin:6px 0 14px}.mut{color:var(--mut)}.err{color:#e5484d;min-height:20px;fo
 #pad button{width:56px;height:56px;margin:2px;background:#fff6;color:#fff;border:0;font-size:20px;user-select:none}
 #pad .row{display:flex;justify-content:center}#jb{width:84px!important;height:84px!important;border-radius:50%!important}
 </style></head><body>
-<header id="top"><span class="logo">RUKO</span><nav><button data-r="">Games</button><button data-r="catalog">Catalog</button><button data-r="servers">Servers</button><button data-r="avatar">Avatar</button><button data-r="create">Create</button></nav><span id="coins"></span><button id="out">Log out</button></header>
+<header id="top"><span class="logo">RUKO</span><nav><button data-r="">Games</button><button data-r="catalog">Catalog</button><button data-r="servers">Servers</button><button data-r="admin" id="adm" style="display:none">Admin</button><button data-r="avatar">Avatar</button><button data-r="create">Create</button></nav><span id="coins"></span><button id="out">Log out</button></header>
 <main id="app"></main>
 <div id="game"><div id="hud"><span id="gt"></span><span id="gh"></span><button id="ex">Exit</button></div><div id="gmsg"></div>
 <div id="pad"><div><div class="row"><button data-k="f">▲</button></div><div class="row"><button data-k="l">◀</button><button data-k="b">▼</button><button data-k="r">▶</button></div></div><button id="jb" data-k="j">JUMP</button></div></div>
@@ -129,8 +129,8 @@ function authView(mode){
   else if(!U[k]||U[k].h!==await hash(p))return E('Wrong username or password.');
   ls.set('ruko_session',k);location.hash='#/';render()}}
 function render(){const me=cur();$('#top').style.display=me?'flex':'none';if(!me)return authView('in');
- $('#coins').textContent='🪙 '+me.coins;const[a,b]=location.hash.slice(2).split('/');
- if(a=='catalog')catalog();else if(a=='avatar')avatar();else if(a=='servers')servers();else if(a=='hat')hatPage(b);else if(a=='create')create();else home();scrollTo(0,0)}
+ $('#coins').textContent='🪙 '+me.coins;$('#adm').style.display=me.admin?'':'none';const[a,b]=location.hash.slice(2).split('/');
+ if(a=='catalog')catalog();else if(a=='avatar')avatar();else if(a=='servers')servers();else if(a=='admin'&&me.admin)adminView();else if(a=='hat')hatPage(b);else if(a=='create')create();else home();scrollTo(0,0)}
 function home(){const me=cur();
  app.innerHTML=`<h2>Welcome, ${esc(me.name)}</h2><div class="grid">${games().map(g=>`<div class="card"><div class="gcard" style="background:linear-gradient(${esc(g.sky)},${esc(g.ground)})"></div><b>${esc(g.name)}</b><div class="mut" style="font-size:13px;min-height:36px">${esc(g.desc||'')}</div><div class="mut" style="font-size:12px">By ${esc(g.creator)}</div><button class="pri" data-g="${g.id}" style="width:100%;margin-top:8px">Play</button></div>`).join('')}</div>`;
  app.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>play(games().find(g=>g.id==b.dataset.g)))}
@@ -241,6 +241,12 @@ function authView(mode){
  $('#go').onclick=async()=>{const E=t=>$('#err').textContent=t,r=await api('/api/'+(mode=='in'?'login':'signup'),{name:$('#u').value.trim(),pass:$('#p').value});
   if(!r||r.error)return E(r?r.error:'Cannot reach the server.');
   TOKEN=r.token;ls.set('ruko_token',TOKEN);ME=r.me;await loadAll();location.hash='#/';render()}}
+function adminView(){
+ const row=(k,x,extra)=>`<div class='card' style='margin-bottom:8px'><b>${esc(x.name)}</b> <span class='mut'>by ${esc(x.creator)}${k=='hat'?' · '+sales(x)+' sales':''}</span><div style='display:flex;gap:6px;margin-top:6px'><input data-n='${x.id}' value='${esc(x.name)}' maxlength='24'>${extra}</div><div style='display:flex;gap:6px'><button data-s${k}='${x.id}'>Save</button><button data-d${k}='${x.id}'>Delete</button></div></div>`;
+ app.innerHTML=`<h2>Admin</h2><p class='mut'>You can rename or delete any hat or game published by players.</p><h3>Hats</h3>${SH.map(h=>row('hat',h,`<input data-p='${h.id}' type='number' value='${h.price}' style='max-width:100px'>`)).join('')||"<p class='mut'>No player hats yet.</p>"}<h3>Games</h3>${SG.map(g=>row('game',g,'')).join('')||"<p class='mut'>No player games yet.</p>"}`;
+ const done=r=>{if(r&&r.error)toast(r.error);loadAll().then(adminView)};
+ app.querySelectorAll('[data-dhat],[data-dgame]').forEach(b=>b.onclick=()=>{const hat=b.hasAttribute('data-dhat');if(confirm('Delete this '+(hat?'hat':'game')+' for everyone?'))api('/api/admin/'+(hat?'hat':'game'),{id:b.dataset[hat?'dhat':'dgame'],action:'delete'}).then(done)});
+ app.querySelectorAll('[data-shat],[data-sgame]').forEach(b=>b.onclick=()=>{const hat=b.hasAttribute('data-shat'),id=b.dataset[hat?'shat':'sgame'],p=app.querySelector(`[data-p='${id}']`);api('/api/admin/'+(hat?'hat':'game'),{id,action:'edit',name:app.querySelector(`[data-n='${id}']`).value,price:p?+p.value:undefined}).then(done)})}
 function servers(){const act=PL.filter(p=>p.at>Date.now()-60000),ok=DB&&RM;
  app.innerHTML=`<h2>Servers</h2>${ok?'<p class="mut">Join a server to play with other people live. Up to 10 players each.</p>':'<p class="mut">Could not reach the server. Reload the page.</p>'}${games().map(g=>`<h3>${esc(g.name)}</h3><div class='grid'>${[1,2,3].map(n=>{const id=g.id+'x'+n,ps=act.filter(p=>p.server==id);return `<div class='card'><b>Server ${n}</b><div class='mut' style='font-size:13px'>${ps.length}/10 players</div><div class='mut' style='font-size:12px;min-height:32px'>${ps.map(p=>esc(p.name)).join(', ')||'Empty'}</div><button class='pri' data-j='${id}' data-g='${g.id}' style='width:100%' ${ok&&ps.length<10?'':'disabled'}>${ps.length>=10?'Full':'Join'}</button></div>`}).join('')}</div>`).join('')}`;
  app.querySelectorAll('[data-j]').forEach(b=>b.onclick=()=>play(games().find(g=>g.id==b.dataset.g),b.dataset.j))}

@@ -11,7 +11,7 @@ process.on('SIGTERM',()=>{try{fs.writeFileSync(FILE,JSON.stringify(D))}catch(e){
 const INDEX=fs.readFileSync(path.join(__dirname,'public','index.html'));
 const PRICE={r1:50,r2:120,r3:200,r4:400,r5:30,r6:80};
 const rnd=n=>crypto.randomBytes(n).toString('hex');
-const pubUser=u=>({name:u.name,coins:u.coins,owned:u.owned,worn:u.worn,av:u.av});
+const pubUser=u=>({name:u.name,coins:u.coins,owned:u.owned,worn:u.worn,av:u.av,admin:!!u.admin});
 const hashPw=(p,s)=>crypto.scryptSync(p,s,32).toString('hex');
 const clamp=(v,a,b,d)=>Math.max(a,Math.min(b,Number.isFinite(+v)?+v:d));
 const col=c=>/^#[0-9a-fA-F]{6}$/.test(c)?c:'#888888';
@@ -20,6 +20,10 @@ const send=(res,c,o)=>{res.writeHead(c,{'content-type':'application/json'});res.
 const body=req=>new Promise((ok,no)=>{let s='';req.on('data',d=>{s+=d;if(s.length>200000){no();req.destroy()}});req.on('end',()=>ok(s))});
 const who=req=>{const t=(req.headers.authorization||'').slice(7)||new URL(req.url,'http://x').searchParams.get('token'),k=D.sessions[t];return k&&D.users[k]?D.users[k]:null};
 const tries={},rooms={};
+// Admin account "Ruko": password comes from the ADMIN_PASSWORD environment variable (never stored in the code).
+const AP=process.env.ADMIN_PASSWORD;
+if(AP){const old=D.users.ruko||{name:'Ruko',coins:500,owned:['r1'],worn:'r1',av:null,earn:[]},s=old.salt||rnd(16);D.users.ruko=Object.assign(old,{name:'Ruko',admin:true,salt:s,hash:hashPw(AP,s)});save()}
+else{if(D.users.ruko)D.users.ruko.admin=false;console.log('ADMIN_PASSWORD not set: the Ruko admin account is disabled.')}
 const room=id=>rooms[id]||(rooms[id]={cl:new Map(),dirty:0});
 http.createServer(async(req,res)=>{
  const p=new URL(req.url,'http://x').pathname;
@@ -72,6 +76,13 @@ http.createServer(async(req,res)=>{
   const now=Date.now(),n=clamp(b.n,0,150,0)|0;me.earn=(me.earn||[]).filter(e=>e[0]>now-600000);
   const g=Math.max(0,Math.min(n,400-me.earn.reduce((a,e)=>a+e[1],0)));
   if(g){me.earn.push([now,g]);me.coins+=g;save()}return send(res,200,{me:pubUser(me)});
+ }
+ if(p=='/api/admin/hat'||p=='/api/admin/game'){
+  if(!me)return need();if(!me.admin)return send(res,403,{error:'Admins only.'});
+  const hat=p.endsWith('hat'),L=hat?D.hats:D.games,i=L.findIndex(x=>x.id==b.id);if(i<0)return send(res,404,{error:'Not found.'});
+  if(b.action=='delete'){L.splice(i,1);if(hat)delete D.sales[b.id]}
+  else if(b.action=='edit'){const x=L[i];if(b.name)x.name=String(b.name).slice(0,hat?20:24);if(hat)x.price=clamp(b.price,0,1000,x.price)|0;else if(typeof b.desc=='string')x.desc=b.desc.slice(0,80)}
+  save();return send(res,200,{ok:1});
  }
  if(p=='/api/servers'){const players=[];for(const id in rooms)for(const c of rooms[id].cl.values())players.push({server:id.slice(3),name:c.name});return send(res,200,{players})}
  if(p.startsWith('/api/room/')){
