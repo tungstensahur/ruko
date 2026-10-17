@@ -77,7 +77,7 @@ function hatMesh(h){const g=new THREE.Group(),M=new THREE.MeshLambertMaterial({c
 let TR;function thumb(h){const k=JSON.stringify([h.type,h.color,h.h,h.w,h.brim]);if(thumb.c[k])return thumb.c[k];
  if(!TR){TR=new THREE.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true});TR.setSize(220,220)}
  const sc=new THREE.Scene();sc.add(new THREE.AmbientLight(0xffffff,.75));const l=new THREE.DirectionalLight(0xffffff,.8);l.position.set(2,3,4);sc.add(l);
- const m=hatMesh(h);m.rotation.y=-.5;sc.add(m);const c=new THREE.PerspectiveCamera(40,1,.1,50);c.position.set(1.4,1.5,2.8);c.lookAt(0,.4,0);
+ const m=hatMesh(h);m.rotation.y=-.5;sc.add(m);const c=new THREE.PerspectiveCamera(40,1,.1,500);c.position.set(1.4,1.5,2.8);c.lookAt(0,.4,0);
  TR.render(sc,c);return thumb.c[k]=TR.domElement.toDataURL()}thumb.c={};
 function makePlayer(hat){const g=new THREE.Group(),L=c=>new THREE.MeshLambertMaterial({color:c});
  const b=new THREE.Mesh(new THREE.BoxGeometry(.8,1.2,.5),L('#3b82f6'));b.position.y=.6;g.add(b);
@@ -87,7 +87,7 @@ function makePlayer(hat){const g=new THREE.Group(),L=c=>new THREE.MeshLambertMat
 /* ---------- game engine ---------- */
 const TK={};
 document.querySelectorAll('#pad button').forEach(b=>{const k=b.dataset.k;b.onpointerdown=e=>{e.preventDefault();TK[k]=1};['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,()=>TK[k]=0))});
-function play(g,srv){
+async function play0(g,srv){
  const me=cur(),hat=hats().find(h=>h.id==me.worn),W=$('#game');W.style.display='block';$('#gt').textContent=g.name+(DEV()=='desktop'?'  ·  WASD move · Space jump · drag to look · wheel zoom':'');$('#gh').textContent='';$('#gmsg').textContent='';
  const R=new THREE.WebGLRenderer({antialias:true});R.setPixelRatio(Math.min(devicePixelRatio,2));R.setSize(innerWidth,innerHeight);W.prepend(R.domElement);
  const S=new THREE.Scene();S.background=new THREE.Color(g.sky);S.fog=new THREE.Fog(g.sky,30,90);
@@ -95,12 +95,12 @@ function play(g,srv){
  const C=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.1,200);
  let s=(+g.seed||1)%2147483646+1;const r=()=>(s=(s*16807)%2147483647)/2147483647;
  const pl=[],coins=[];
- const P=(x,y,z,sx,sz,c)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(sx,.5,sz),new THREE.MeshLambertMaterial({color:c}));m.position.set(x,y-.25,z);S.add(m);pl.push({x,y,z,sx,sz})};
- const n=Math.max(5,Math.min(40,+g.size||16));let last=-1;
- if(g.mode=='obby'){P(0,0,0,6,6,g.ground);let x=0,y=0,z=0;for(let i=0;i<n;i++){x+=(r()-.5)*6;y+=.3+r()*.9;z-=4.5+r()*1.5;P(x,y,z,3,3,i==n-1?'#ffd23f':`hsl(${i*37%360},70%,60%)`)}last=pl.length-1}
+ const P=(x,y,z,sx,sz,c,t)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(sx,.5,sz),new THREE.MeshLambertMaterial({color:c}));m.position.set(x,y-.25,z);S.add(m);pl.push({x,y,z,sx,sz,t})};
+ const n=Math.max(5,Math.min(40,+g.size||16));let last=-1,spawn=null;
+ if(g.objs){g.objs.forEach(o=>{if(o.k=='p')P(o.x,o.y,o.z,o.sx,o.sz,TC(o),o.t);else if(o.k=='c'){const m=new THREE.Mesh(new THREE.CylinderGeometry(.35,.35,.08,16),new THREE.MeshLambertMaterial({color:'#ffc800'}));m.rotation.x=1.57;m.position.set(o.x,o.y,o.z);S.add(m);coins.push(m)}else if(o.k=='s')spawn={x:o.x,y:o.y,z:o.z}})}else if(g.mode=='obby'){P(0,0,0,6,6,g.ground);let x=0,y=0,z=0;for(let i=0;i<n;i++){x+=(r()-.5)*6;y+=.3+r()*.9;z-=4.5+r()*1.5;P(x,y,z,3,3,i==n-1?'#ffd23f':`hsl(${i*37%360},70%,60%)`)}last=pl.length-1}
  else{P(0,0,0,60,60,g.ground);for(let i=0;i<(g.mode=='roam'?12:6);i++)P((r()-.5)*40,.8+r()*2,(r()-.5)*40,3,3,`hsl(${r()*360},60%,60%)`);
   if(g.mode=='coins')for(let i=0;i<(g.coinN||25);i++){const m=new THREE.Mesh(new THREE.CylinderGeometry(.35,.35,.08,16),new THREE.MeshLambertMaterial({color:'#ffc800'}));m.rotation.x=1.57;m.position.set((r()-.5)*40,.9+r()*1.4,(r()-.5)*40);S.add(m);coins.push(m)}}
- const pm=makePlayer(hat,me.av);S.add(pm);const sp0={x:0,y:0,z:0},ts=performance.now(),cv=R.domElement;let cy=0,cd=10,dr=0,lx=0;cv.onpointerdown=e=>{dr=1;lx=e.clientX;cv.setPointerCapture(e.pointerId)};cv.onpointerup=cv.onpointercancel=()=>dr=0;cv.onpointermove=e=>{if(dr){cy-=(e.clientX-lx)*.008;lx=e.clientX}};cv.onwheel=e=>{cd=Math.max(5,Math.min(22,cd+e.deltaY*.01))};const rem={};let rr=null,off=null,hb=0;if(srv){setSrv(srv);if(RM)RM.join('srv'+srv).then(r=>{rr=r;off=r.onPeers(c=>{const seen={};c.peers.forEach(q=>{const s=q.presence;if(q.isMe||!s||s.x==null)return;seen[q.peer]=1;let o=rem[q.peer];const k=JSON.stringify([s.hat,s.av]);if(!o||o.k!=k){if(o)S.remove(o.m);const m=makePlayer(hats().find(h=>h.id==s.hat),s.av);S.add(m);o=rem[q.peer]={m,k,t:s}}o.t=s});Object.keys(rem).forEach(i=>{if(!seen[i]){S.remove(rem[i].m);delete rem[i]}})})}).catch(()=>{})}const p={x:0,y:0,z:0,vy:0};let got=0,done=0,raf,t0=performance.now();
+ const pm=makePlayer(hat,me.av);S.add(pm);const sp0=spawn?{...spawn}:{x:0,y:0,z:0},ts=performance.now(),cv=R.domElement;let cy=0,cd=10,dr=0,lx=0;cv.onpointerdown=e=>{dr=1;lx=e.clientX;cv.setPointerCapture(e.pointerId)};cv.onpointerup=cv.onpointercancel=()=>dr=0;cv.onpointermove=e=>{if(dr){cy-=(e.clientX-lx)*.008;lx=e.clientX}};cv.onwheel=e=>{cd=Math.max(5,Math.min(22,cd+e.deltaY*.01))};const rem={};let rr=null,off=null,hb=0;if(srv){setSrv(srv);if(RM)RM.join('srv'+srv).then(r=>{rr=r;off=r.onPeers(c=>{const seen={};c.peers.forEach(q=>{const s=q.presence;if(q.isMe||!s||s.x==null)return;seen[q.peer]=1;let o=rem[q.peer];const k=JSON.stringify([s.hat,s.av]);if(!o||o.k!=k){if(o)S.remove(o.m);const m=makePlayer(hats().find(h=>h.id==s.hat),s.av);S.add(m);o=rem[q.peer]={m,k,t:s}}o.t=s});Object.keys(rem).forEach(i=>{if(!seen[i]){S.remove(rem[i].m);delete rem[i]}})})}).catch(()=>{})}const p={x:sp0.x,y:sp0.y+(spawn?.5:0),z:sp0.z,vy:0};let got=0,done=0,raf,t0=performance.now();
  const keys={},kd=e=>{keys[e.key.toLowerCase()]=1;if(e.key==' ')e.preventDefault()},ku=e=>keys[e.key.toLowerCase()]=0;
  addEventListener('keydown',kd);addEventListener('keyup',ku);
  const msg=t=>{$('#gmsg').textContent=t;setTimeout(()=>$('#gmsg').textContent='',2500)};
@@ -109,7 +109,7 @@ function play(g,srv){
   const ax=(K('d')||K('arrowright')||K('r')?1:0)-(K('a')||K('arrowleft')||K('l')?1:0),az=(K('s')||K('arrowdown')||K('b')?1:0)-(K('w')||K('arrowup')||K('f')?1:0);
   const m=Math.hypot(ax,az)||1,sp=g.spd||7,ix=ax/m*sp,iz=az/m*sp,vx=ix*Math.cos(cy)+iz*Math.sin(cy),vz=-ix*Math.sin(cy)+iz*Math.cos(cy);p.x+=vx*dt;p.z+=vz*dt;if(ax||az)pm.rotation.y=Math.atan2(vx,vz);
   const py=p.y;p.vy-=(g.grav||22)*dt;p.y+=p.vy*dt;let on=0;
-  pl.forEach((q,i)=>{if(p.vy<=0&&py>=q.y-.1&&p.y<=q.y&&Math.abs(p.x-q.x)<=q.sx/2+.3&&Math.abs(p.z-q.z)<=q.sz/2+.3){p.y=q.y;p.vy=0;on=1;if(g.cps&&i&&i%5==0){sp0.x=q.x;sp0.y=q.y;sp0.z=q.z}if(i==last&&!done){done=1;got+=100;msg('You won! +100 Rukos')}}});
+  pl.forEach((q,i)=>{if(p.vy<=0&&py>=q.y-.1&&p.y<=q.y&&Math.abs(p.x-q.x)<=q.sx/2+.3&&Math.abs(p.z-q.z)<=q.sz/2+.3){p.y=q.y;p.vy=0;on=1;if(g.cps&&i&&i%5==0){sp0.x=q.x;sp0.y=q.y;sp0.z=q.z}if(q.t=='lava'){p.x=sp0.x;p.z=sp0.z;p.y=sp0.y+1;p.vy=0;msg('Ouch!');return}if(q.t=='bounce'){p.vy=17;on=0}if(q.t=='check'){sp0.x=q.x;sp0.y=q.y;sp0.z=q.z}if((i==last||q.t=='goal')&&!done){done=1;got+=100;msg('You won! +100 Rukos')}}});
   if(on&&(K(' ')||K('j')))p.vy=g.jmp||9;
   if(p.y<-15){p.x=sp0.x;p.z=sp0.z;p.y=sp0.y+1;p.vy=0}
   coins.forEach(c=>{if(!c.visible)return;c.rotation.z+=dt*3;if(Math.hypot(c.position.x-p.x,c.position.y-p.y-1.3,c.position.z-p.z)<1.8){c.visible=false;got+=5}});
@@ -171,7 +171,7 @@ function parts(h){if(h.parts)return h.parts;const w=+h.w||1,H=+h.h||.5,c=h.color
 function hatMesh(h){const g=new THREE.Group();parts(h).forEach(p=>{const mat=p.f=='neon'?new THREE.MeshBasicMaterial({color:p.c}):p.f=='shiny'?new THREE.MeshPhongMaterial({color:p.c,shininess:110,specular:0x888888}):new THREE.MeshLambertMaterial({color:p.c}),m=new THREE.Mesh(GEO[p.t](),mat);m.scale.set(p.sx,p.sy,p.sz);m.position.set(p.x||0,p.y||0,p.z||0);m.rotation.z=(p.r||0)*.01745;m.rotation.x=(p.q||0)*.01745;g.add(m)});return g}
 function shot(obj,cp,look){if(!TR){TR=new THREE.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true});TR.setSize(300,300)}
  const sc=new THREE.Scene();sc.add(new THREE.AmbientLight(0xffffff,.75));const l=new THREE.DirectionalLight(0xffffff,.8);l.position.set(2,3,4);sc.add(l);sc.add(obj);
- const c=new THREE.PerspectiveCamera(40,1,.1,50);c.position.set(...cp);c.lookAt(...look);TR.render(sc,c);return TR.domElement.toDataURL()}
+ const c=new THREE.PerspectiveCamera(40,1,.1,500);c.position.set(...cp);c.lookAt(...look);TR.render(sc,c);return TR.domElement.toDataURL()}
 function thumb(h){const k=JSON.stringify(parts(h));if(thumb.c[k])return thumb.c[k];const m=hatMesh(h);m.rotation.y=-.5;return thumb.c[k]=shot(m,[1.4,1.5,2.8],[0,.5,0])}
 function faceTex(c,f){const k=document.createElement('canvas');k.width=k.height=64;const x=k.getContext('2d');x.fillStyle=c;x.fillRect(0,0,64,64);x.fillStyle=x.strokeStyle='#222';x.lineWidth=4;x.lineCap='round';
  if(f==2){x.beginPath();x.arc(22,26,4,0,7);x.fill();x.beginPath();x.arc(42,26,4,0,7);x.fill();x.beginPath();x.arc(32,46,6,0,7);x.fill()}
@@ -183,7 +183,7 @@ function makePlayer(hat,av){av=Object.assign({skin:'#f5cd30',shirt:'#2f6fed',pan
  g.add(bx(1.2,1.2,.6,Lm(av.shirt),1.8));g.add(bx(.7,.7,.7,[sk,sk,sk,sk,new THREE.MeshLambertMaterial({map:faceTex(av.skin,av.face)}),sk],2.75));
  const limb=(x,m,top)=>{const p=new THREE.Group();p.position.set(x,top,0);p.add(bx(.55,1.2,.55,m,-.6));g.add(p);return p},pm=Lm(av.pants);
  g.userData.l={la:limb(-.88,sk,2.4),ra:limb(.88,sk,2.4),ll:limb(-.3,pm,1.2),rl:limb(.3,pm,1.2)};
- if(hat){const m=hatMesh(hat);m.position.y=3.1;g.add(m)}return g}
+ if(hat){const m=hatMesh(hat);m.position.set(...(SL[hat.slot]||SL.head));g.add(m)}return g}
 function avatar(){const me=cur(),av=Object.assign({skin:'#f5cd30',shirt:'#2f6fed',pants:'#4a9c3a',face:0},me.av);let rot=.4;
  const sk=['#f5cd30','#ffd9a8','#e0ac69','#c68642','#8d5524','#5b3a1e','#a5d6ff','#b6ff9f'],own=me.owned.map(i=>hats().find(h=>h.id==i)).filter(Boolean);
  app.innerHTML=`<h2>Avatar</h2><div class="hat"><div class="card"><img id="pv" alt=""><input id="rt" type="range" min="-3.14" max="3.14" step=".05" value=".4"></div><div class="card"><label>Skin tone</label><div class="chips">${sk.map(c=>`<button data-sk="${c}" style="background:${c};width:36px;height:36px"></button>`).join('')}</div><label>Skin color</label><input id="as" type="color" value="${av.skin}"><label>Shirt</label><input id="ah" type="color" value="${av.shirt}"><label>Pants</label><input id="ap" type="color" value="${av.pants}"><label>Face</label><select id="af">${['Smile','Cool','Surprised','Stoic'].map((n,i)=>`<option value="${i}" ${i==av.face?'selected':''}>${n}</option>`).join('')}</select><label>Hat</label><div class="chips"><button data-w="">None</button>${own.map(h=>`<button data-w="${h.id}" style="width:64px;padding:2px"><img src="${thumb(h)}" style="width:100%" alt="${esc(h.name)}"></button>`).join('')}</div></div></div>`;
@@ -241,12 +241,85 @@ function authView(mode){
  $('#go').onclick=async()=>{const E=t=>$('#err').textContent=t,r=await api('/api/'+(mode=='in'?'login':'signup'),{name:$('#u').value.trim(),pass:$('#p').value});
   if(!r||r.error)return E(r?r.error:'Cannot reach the server.');
   TOKEN=r.token;ls.set('ruko_token',TOKEN);ME=r.me;await loadAll();location.hash='#/';render()}}
-function adminView(){
+async function adminView(){const us=(await api('/api/admin/users'))||{users:[]},UH=adminUsers(us.users);
  const row=(k,x,extra)=>`<div class='card' style='margin-bottom:8px'><b>${esc(x.name)}</b> <span class='mut'>by ${esc(x.creator)}${k=='hat'?' · '+sales(x)+' sales':''}</span><div style='display:flex;gap:6px;margin-top:6px'><input data-n='${x.id}' value='${esc(x.name)}' maxlength='24'>${extra}</div><div style='display:flex;gap:6px'><button data-s${k}='${x.id}'>Save</button><button data-d${k}='${x.id}'>Delete</button></div></div>`;
- app.innerHTML=`<h2>Admin</h2><p class='mut'>You can rename or delete any hat or game published by players.</p><h3>Hats</h3>${SH.map(h=>row('hat',h,`<input data-p='${h.id}' type='number' value='${h.price}' style='max-width:100px'>`)).join('')||"<p class='mut'>No player hats yet.</p>"}<h3>Games</h3>${SG.map(g=>row('game',g,'')).join('')||"<p class='mut'>No player games yet.</p>"}`;
+ app.innerHTML=`<h2>Admin</h2><p class='mut'>You can rename or delete any hat or game published by players.</p>${UH}<h3>Hats</h3>${SH.map(h=>row('hat',h,`<input data-p='${h.id}' type='number' value='${h.price}' style='max-width:100px'>`)).join('')||"<p class='mut'>No player hats yet.</p>"}<h3>Games</h3>${SG.map(g=>row('game',g,'')).join('')||"<p class='mut'>No player games yet.</p>"}`;
  const done=r=>{if(r&&r.error)toast(r.error);loadAll().then(adminView)};
- app.querySelectorAll('[data-dhat],[data-dgame]').forEach(b=>b.onclick=()=>{const hat=b.hasAttribute('data-dhat');if(confirm('Delete this '+(hat?'hat':'game')+' for everyone?'))api('/api/admin/'+(hat?'hat':'game'),{id:b.dataset[hat?'dhat':'dgame'],action:'delete'}).then(done)});
+ bindAdminUsers(done);app.querySelectorAll('[data-dhat],[data-dgame]').forEach(b=>b.onclick=()=>{const hat=b.hasAttribute('data-dhat');if(confirm('Delete this '+(hat?'hat':'game')+' for everyone?'))api('/api/admin/'+(hat?'hat':'game'),{id:b.dataset[hat?'dhat':'dgame'],action:'delete'}).then(done)});
  app.querySelectorAll('[data-shat],[data-sgame]').forEach(b=>b.onclick=()=>{const hat=b.hasAttribute('data-shat'),id=b.dataset[hat?'shat':'sgame'],p=app.querySelector(`[data-p='${id}']`);api('/api/admin/'+(hat?'hat':'game'),{id,action:'edit',name:app.querySelector(`[data-n='${id}']`).value,price:p?+p.value:undefined}).then(done)})}
+/* ---------- v4: level editor, advanced hat editor, admin tools ---------- */
+Object.assign(GEO,{pyramid:()=>new THREE.ConeGeometry(.5,1,4),prism:()=>new THREE.CylinderGeometry(.5,.5,1,3),octa:()=>new THREE.OctahedronGeometry(.5),ico:()=>new THREE.IcosahedronGeometry(.5)});
+const SL={head:[0,3.1,0],face:[0,2.75,.38],back:[0,1.8,-.35]};
+const TC=o=>o.t=='lava'?'#ff4b1f':o.t=='bounce'?'#2ee6a6':o.t=='goal'?'#ffd23f':o.t=='check'?'#4b9bff':o.c;
+async function play(g,srv){if(g.n&&!g.objs){const r=await api('/api/game?id='+encodeURIComponent(g.id));if(!r||!r.game)return toast('Could not load that game.');g.objs=r.game.objs}return play0(g,srv)}
+function hatMesh(h){const g=new THREE.Group();parts(h).forEach(p=>{const mk=(x,r,ry)=>{const c=p.c,f=p.f,mat=f=='neon'?new THREE.MeshBasicMaterial({color:c}):f=='shiny'?new THREE.MeshPhongMaterial({color:c,shininess:110,specular:0x888888}):f=='metal'?new THREE.MeshPhongMaterial({color:c,shininess:220,specular:0xffffff}):f=='glass'?new THREE.MeshPhongMaterial({color:c,shininess:120,transparent:true,opacity:.45}):new THREE.MeshLambertMaterial({color:c}),m=new THREE.Mesh((GEO[p.t]||GEO.box)(),mat);m.scale.set(p.sx,p.sy,p.sz);m.position.set(x,p.y||0,p.z||0);m.rotation.order='YXZ';m.rotation.y=ry*.01745;m.rotation.z=r*.01745;m.rotation.x=(p.q||0)*.01745;g.add(m)};
+ mk(p.x||0,p.r||0,p.ry||0);if(p.m&&p.x)mk(-p.x,-(p.r||0),-(p.ry||0))});return g}
+const FD2=[['sx','Width',.05,3,.05],['sy','Height',.05,3,.05],['sz','Depth',.05,3,.05],['x','Move X',-1.6,1.6,.05],['y','Move Y',-1.5,2.5,.05],['z','Move Z',-1.6,1.6,.05],['r','Tilt side',-90,90,5],['q','Tilt front',-90,90,5],['ry','Spin',-180,180,5]];
+function hatEd(me){HE=HE&&HE.hist?HE:{name:'My Accessory',price:100,slot:'head',parts:[{t:'cylinder',c:'#5b4bff',f:'matte',sx:.7,sy:.6,sz:.7,x:0,y:.3,z:0,r:0,q:0,ry:0,m:0}],sel:0,rot:.4,zoom:5,hist:[],ts:0};const E=$('#ed');
+ const sn=()=>{const t=Date.now();if(t-HE.ts>800){HE.hist.push(JSON.stringify(HE.parts));if(HE.hist.length>30)HE.hist.shift()}HE.ts=t},snf=()=>{HE.ts=0;sn()};
+ const draw=()=>{const p=HE.parts[HE.sel];
+  E.innerHTML=`<div class="hat"><div class="card"><img id="pv" alt=""><label>Rotate</label><input id="rt" type="range" min="-3.14" max="3.14" step=".05" value="${HE.rot}"><label>Zoom out</label><input id="zm" type="range" min="2.5" max="9" step=".25" value="${HE.zoom}"><div class="chips">${HE.parts.map((q,i)=>`<button data-s="${i}" class="${i==HE.sel?'on':''}">${i+1}. ${q.t}</button>`).join('')}</div><div class="chips"><button id="ap">+ Add</button><button id="dp">Duplicate</button><button id="xp">Delete</button><button id="un">Undo</button></div><label>Remix an existing item</label><select id="rx"><option value="">Choose…</option>${hats().map(h=>`<option value="${h.id}">${esc(h.name)}</option>`).join('')}</select></div>
+  <div class="card"><label>Shape</label><select id="pt">${Object.keys(GEO).map(k=>`<option ${k==p.t?'selected':''}>${k}</option>`).join('')}</select><label>Color</label><input id="pc" type="color" value="${p.c}"><label>Finish</label><select id="pf">${['matte','shiny','metal','glass','neon'].map(k=>`<option ${k==p.f?'selected':''}>${k}</option>`).join('')}</select><label><input id="pm" type="checkbox" ${p.m?'checked':''}> Mirror to the other side (ears, horns, wings)</label>${FD2.map(([k,n,a,b,s])=>`<label>${n}</label><input data-k="${k}" type="range" min="${a}" max="${b}" step="${s}" value="${p[k]||0}">`).join('')}</div></div>
+  <div class="card" style="margin-top:12px"><label>Name</label><input id="hn" maxlength="20" value="${esc(HE.name)}"><label>Where it is worn</label><select id="sl">${[['head','Head (hats, hair)'],['face','Face (glasses, masks)'],['back','Back (wings, capes, backpacks)']].map(([v,n])=>`<option value="${v}" ${v==HE.slot?'selected':''}>${n}</option>`).join('')}</select><label>Price (Rukos)</label><input id="hp" type="number" min="0" max="1000" value="${HE.price}"><button class="pri" id="pub" style="width:100%">Publish</button></div>`;
+  const pv=()=>{const m=makePlayer({parts:HE.parts,slot:HE.slot},cur().av),b=HE.slot=='back';m.rotation.y=HE.rot;$('#pv').src=shot(m,[0,b?2.4:3,HE.zoom],[0,b?1.9:2.8,0])};pv();
+  $('#rt').oninput=e=>{HE.rot=+e.target.value;pv()};$('#zm').oninput=e=>{HE.zoom=+e.target.value;pv()};
+  E.querySelectorAll('[data-k]').forEach(i=>i.oninput=()=>{sn();p[i.dataset.k]=+i.value;pv()});
+  $('#pt').onchange=e=>{sn();p.t=e.target.value;pv()};$('#pc').oninput=e=>{sn();p.c=e.target.value;pv()};$('#pf').onchange=e=>{sn();p.f=e.target.value;pv()};$('#pm').onchange=e=>{sn();p.m=e.target.checked?1:0;pv()};
+  $('#sl').onchange=e=>{HE.slot=e.target.value;pv()};$('#hn').oninput=e=>HE.name=e.target.value;$('#hp').oninput=e=>HE.price=+e.target.value;
+  E.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{HE.sel=+b.dataset.s;draw()});
+  const add=o=>{if(HE.parts.length>=16)return;snf();HE.parts.push(o);HE.sel=HE.parts.length-1;draw()};
+  $('#ap').onclick=()=>add({t:'sphere',c:'#ff4b8b',f:'matte',sx:.3,sy:.3,sz:.3,x:0,y:.7,z:0,r:0,q:0,ry:0,m:0});$('#dp').onclick=()=>add({...p});
+  $('#xp').onclick=()=>{if(HE.parts.length>1){snf();HE.parts.splice(HE.sel,1);HE.sel=0;draw()}};
+  $('#un').onclick=()=>{if(HE.hist.length){HE.parts=JSON.parse(HE.hist.pop());HE.sel=Math.min(HE.sel,HE.parts.length-1);draw()}};
+  $('#rx').onchange=e=>{const h=hats().find(x=>x.id==e.target.value);if(h){snf();HE.parts=JSON.parse(JSON.stringify(parts(h)));HE.slot=h.slot||'head';HE.name=h.name+' Remix';HE.sel=0;draw()}};
+  $('#pub').onclick=()=>{const h={id:'h'+Date.now(),name:HE.name.trim()||'Untitled',creator:me.name,price:Math.max(0,Math.min(1000,HE.price||0)),parts:HE.parts,slot:HE.slot,base:0};pub('hats',h);HE=null;location.hash='#/hat/'+h.id}};draw()}
+const TPL={blank:()=>[{k:'s',x:0,y:0,z:0},{k:'p',t:'solid',x:0,y:0,z:0,sx:6,sz:6,c:'#5bd16a'}],
+ obby:()=>{const o=TPL.blank();let x=0,y=0,z=0;for(let i=0;i<10;i++){z-=5;y+=.6;x+=i%2?3:-3;o.push({k:'p',t:i==9?'goal':i==4?'check':'solid',x,y,z,sx:3,sz:3,c:'#'+['ff7a59','7c6cff','35c4a0','ffb84d','4b9bff'][i%5]})}return o},
+ park:()=>{const o=[{k:'s',x:0,y:0,z:0},{k:'p',t:'solid',x:0,y:0,z:0,sx:50,sz:50,c:'#7bc96f'}];for(let i=0;i<12;i++)o.push({k:'c',x:(i*7%40)-20,y:1.2,z:(i*11%40)-20});return o}};
+let GE=null;
+function gameEd(me){GE=GE||{name:'My Game',desc:'A game I made.',sky:'#8fd3ff',spd:7,jmp:9,grav:22,objs:TPL.blank(),sel:-1,tool:'sel',rot:.6,zoom:1.2};const E=$('#ed'),O=()=>GE.objs,Fi=(id,l,t,v,x='')=>`<label>${l}</label><input id="${id}" type="${t}" value="${v}" ${x}>`;
+ E.innerHTML=`<div class="card"><p class="mut" style="margin-top:0">Top-down map. Pick a tool, tap the map to place things, drag to move them.</p><canvas id="cv" width="360" height="360" style="width:100%;max-width:480px;touch-action:none;border-radius:10px"></canvas><div class="chips">${[['sel','Select / move'],['plat','+ Platform'],['coin','+ Coin'],['spawn','Set spawn']].map(([k,n])=>`<button data-tl="${k}">${n}</button>`).join('')}</div><div id="props"></div></div>
+ <div class="card" style="margin-top:12px"><img id="lv" alt="" style="width:100%;max-width:420px;border-radius:10px"><label>Rotate view</label><input id="lr" type="range" min="-3.14" max="3.14" step=".05" value="${GE.rot}"><label>Zoom out</label><input id="lz" type="range" min=".6" max="2.5" step=".1" value="${GE.zoom}"></div>
+ <div class="card" style="margin-top:12px">${Fi('gn','Name','text',esc(GE.name),'maxlength="24"')}${Fi('gd','Description','text',esc(GE.desc),'maxlength="80"')}${Fi('gs','Sky color','color',GE.sky)}${Fi('sp','Walk speed (4-14)','number',GE.spd)}${Fi('jp','Jump power (6-16)','number',GE.jmp)}${Fi('gr','Gravity (10-40)','number',GE.grav)}<label>Load a template (replaces the level)</label><select id="tp"><option value="">Choose…</option><option value="blank">Blank</option><option value="obby">Obby</option><option value="park">Coin park</option></select><div style="display:flex;gap:8px;margin-top:10px"><button id="tst" style="flex:1">Test play</button><button class="pri" id="pub" style="flex:1">Publish</button></div></div>`;
+ const cv=$('#cv'),cx=cv.getContext('2d'),X=o=>180+o.x*6,Z=o=>180+o.z*6;
+ const draw=()=>{cx.fillStyle='#1d2040';cx.fillRect(0,0,360,360);cx.strokeStyle='#ffffff1a';cx.lineWidth=1;for(let i=0;i<=60;i+=5){cx.beginPath();cx.moveTo(i*6,0);cx.lineTo(i*6,360);cx.moveTo(0,i*6);cx.lineTo(360,i*6);cx.stroke()}
+  O().map((o,i)=>[o,i]).filter(a=>a[0].k=='p').sort((a,b)=>a[0].y-b[0].y).forEach(([o,i])=>{cx.fillStyle=TC(o);cx.fillRect(X(o)-o.sx*3,Z(o)-o.sz*3,o.sx*6,o.sz*6);if(i==GE.sel){cx.strokeStyle='#fff';cx.lineWidth=3;cx.strokeRect(X(o)-o.sx*3,Z(o)-o.sz*3,o.sx*6,o.sz*6)}cx.fillStyle='#000a';cx.font='10px sans-serif';cx.fillText(o.y,X(o)-6,Z(o)+3)});
+  O().forEach((o,i)=>{if(o.k=='p')return;cx.fillStyle=o.k=='c'?'#ffc800':'#39d353';cx.beginPath();cx.arc(X(o),Z(o),o.k=='c'?4:7,0,7);cx.fill();if(i==GE.sel){cx.strokeStyle='#fff';cx.lineWidth=2;cx.stroke()}})};
+ let pq=0;const prev=()=>{if(pq)return;pq=1;requestAnimationFrame(()=>{pq=0;const g=new THREE.Group();let a=1e9,b=-1e9,c=1e9,d=-1e9,hy=0;
+  O().forEach(o=>{if(o.k=='p'){const m=new THREE.Mesh(new THREE.BoxGeometry(o.sx,.5,o.sz),new THREE.MeshLambertMaterial({color:TC(o)}));m.position.set(o.x,o.y-.25,o.z);g.add(m);a=Math.min(a,o.x-o.sx/2);b=Math.max(b,o.x+o.sx/2);c=Math.min(c,o.z-o.sz/2);d=Math.max(d,o.z+o.sz/2);hy=Math.max(hy,o.y)}else{const m=new THREE.Mesh(o.k=='c'?new THREE.CylinderGeometry(.35,.35,.1,12):new THREE.ConeGeometry(.5,1.2,10),new THREE.MeshLambertMaterial({color:o.k=='c'?'#ffc800':'#39d353'}));m.position.set(o.x,o.y+(o.k=='s'?.6:0),o.z);if(o.k=='c')m.rotation.x=1.57;g.add(m)}});
+  if(a>b){a=b=c=d=0}const mx=(a+b)/2,mz=(c+d)/2,D=Math.max(b-a,d-c,10)*GE.zoom*1.1;$('#lv').style.background=GE.sky;$('#lv').src=shot(g,[mx+Math.sin(GE.rot)*D,hy/2+D*.7,mz+Math.cos(GE.rot)*D],[mx,hy/2,mz])})};
+ const tl=()=>E.querySelectorAll('[data-tl]').forEach(b=>{b.classList.toggle('on',b.dataset.tl==GE.tool);b.onclick=()=>{GE.tool=b.dataset.tl;tl()}});
+ const props=()=>{const o=O()[GE.sel],P=$('#props');if(!o){P.innerHTML='<p class="mut">Tap a platform, coin or the spawn point on the map to edit it.</p>';return}
+  const sl=(k,n,a,b,s)=>`<label>${n}</label><input data-k="${k}" type="range" min="${a}" max="${b}" step="${s}" value="${o[k]}">`;
+  P.innerHTML=`<b>${o.k=='p'?'Platform':o.k=='c'?'Coin':'Spawn point'}</b>${o.k=='p'?`<label>Type</label><select id="ot">${[['solid','Solid'],['lava','Lava (respawn)'],['bounce','Bounce pad'],['check','Checkpoint'],['goal','Goal (win)']].map(([v,n])=>`<option value="${v}" ${v==o.t?'selected':''}>${n}</option>`).join('')}</select><label>Color (solid only)</label><input id="oc" type="color" value="${o.c}">`:''}${sl('x','X',-30,30,.5)}${sl('y','Height',-5,40,.25)}${sl('z','Z',-30,30,.5)}${o.k=='p'?sl('sx','Width',.5,40,.5)+sl('sz','Depth',.5,40,.5):''}${o.k=='s'?'':'<div class="chips"><button id="od">Duplicate</button><button id="ox">Delete</button></div>'}`;
+  P.querySelectorAll('[data-k]').forEach(i=>i.oninput=()=>{o[i.dataset.k]=+i.value;draw();prev()});
+  if(o.k=='p'){$('#ot').onchange=e=>{o.t=e.target.value;draw();prev()};$('#oc').oninput=e=>{o.c=e.target.value;draw();prev()}}
+  if(o.k!='s'){$('#od').onclick=()=>{O().push({...o,x:o.x+1,z:o.z+1});GE.sel=O().length-1;props();draw();prev()};$('#ox').onclick=()=>{O().splice(GE.sel,1);GE.sel=-1;props();draw();prev()}}};
+ const pt=e=>{const r=cv.getBoundingClientRect();return[(e.clientX-r.left)/r.width*360,(e.clientY-r.top)/r.height*360]},sn=v=>Math.max(-30,Math.min(30,Math.round(v/3)/2));
+ const hit=(sx,sy)=>{const os=O();for(let i=os.length-1;i>=0;i--){const o=os[i];if(o.k!='p'&&Math.hypot(sx-X(o),sy-Z(o))<10)return i}let b=-1;os.forEach((o,i)=>{if(o.k=='p'&&Math.abs(sx-X(o))<=o.sx*3&&Math.abs(sy-Z(o))<=o.sz*3&&(b<0||o.y>=os[b].y))b=i});return b};
+ let drag=0;
+ cv.onpointerdown=e=>{const[sx,sy]=pt(e),x=sn(sx-180),z=sn(sy-180),os=O();
+  if(GE.tool=='plat'){os.push({k:'p',t:'solid',x,y:os.filter(o=>o.k=='p').reduce((m,o)=>Math.max(m,o.y),0),z,sx:3,sz:3,c:'#7c6cff'});GE.sel=os.length-1;GE.tool='sel'}
+  else if(GE.tool=='coin'){os.push({k:'c',x,y:1.2,z});GE.sel=os.length-1;GE.tool='sel'}
+  else if(GE.tool=='spawn'){const s=os.find(o=>o.k=='s');s.x=x;s.z=z;s.y=Math.max(0,...os.filter(o=>o.k=='p'&&Math.abs(x-o.x)<=o.sx/2&&Math.abs(z-o.z)<=o.sz/2).map(o=>o.y));GE.sel=os.indexOf(s);GE.tool='sel'}
+  else{GE.sel=hit(sx,sy);drag=GE.sel>=0;cv.setPointerCapture(e.pointerId)}
+  tl();props();draw();prev()};
+ cv.onpointermove=e=>{if(!drag)return;const o=O()[GE.sel],[sx,sy]=pt(e);o.x=sn(sx-180);o.z=sn(sy-180);draw();prev()};
+ cv.onpointerup=cv.onpointercancel=()=>{if(drag){drag=0;props()}};
+ $('#lr').oninput=e=>{GE.rot=+e.target.value;prev()};$('#lz').oninput=e=>{GE.zoom=+e.target.value;prev()};$('#gs').oninput=e=>{GE.sky=e.target.value;prev()};
+ [['gn','name'],['gd','desc'],['sp','spd'],['jp','jmp'],['gr','grav']].forEach(([i,k])=>$('#'+i).oninput=e=>GE[k]=e.target.value);
+ $('#tp').onchange=e=>{if(TPL[e.target.value]){GE.objs=TPL[e.target.value]();GE.sel=-1;props();draw();prev()}};
+ const num=(id,a,b,d)=>Math.max(a,Math.min(b,+$('#'+id).value||d)),spec=()=>({id:'c'+Date.now(),name:$('#gn').value.trim()||'Untitled',desc:$('#gd').value.trim(),creator:me.name,mode:'custom',sky:$('#gs').value,ground:'#5bd16a',size:16,seed:1,spd:num('sp',4,14,7),jmp:num('jp',6,16,9),grav:num('gr',10,40,22),coinN:25,cps:false,objs:JSON.parse(JSON.stringify(O()))});
+ $('#tst').onclick=()=>play(spec());
+ $('#pub').onclick=()=>{if(!O().some(o=>o.k=='p'))return toast('Add at least one platform.');pub('games',spec());GE=null;location.hash='#/'};
+ tl();props();draw();prev()}
+function adminUsers(us){const H=hats();return `<div class="card" style="margin-bottom:8px"><b>Give everyone Rukos</b><div style="display:flex;gap:6px;margin-top:6px"><input id="ga" type="number" placeholder="Amount"><button id="gall">Give all</button></div></div><h3>Players</h3>${us.map(u=>`<div class="card" style="margin-bottom:8px"><b>${esc(u.name)}</b> <span class="mut">🪙 ${u.coins} · ${u.owned} items${u.banned?' · BANNED':''}</span><div style="display:flex;gap:6px;margin-top:6px"><input data-ca="${esc(u.name)}" type="number" placeholder="Rukos (negative removes)"><button data-cg="${esc(u.name)}">Give</button></div><div style="display:flex;gap:6px;margin-top:6px"><select data-hs="${esc(u.name)}">${H.map(h=>`<option value="${h.id}">${esc(h.name)}</option>`).join('')}</select><button data-hg="${esc(u.name)}">Give</button><button data-ht="${esc(u.name)}">Take</button></div>${u.admin?'':`<button style="margin-top:6px" data-ban="${esc(u.name)}" data-b="${u.banned?0:1}">${u.banned?'Unban':'Ban'}</button>`}</div>`).join('')}`}
+function bindAdminUsers(done){const g=o=>api('/api/admin/grant',o).then(done),q=(a,n)=>app.querySelector(`[data-${a}="${n}"]`);
+ $('#gall').onclick=()=>g({all:1,coins:+$('#ga').value||0});
+ app.querySelectorAll('[data-cg]').forEach(b=>b.onclick=()=>g({user:b.dataset.cg,coins:+q('ca',b.dataset.cg).value||0}));
+ app.querySelectorAll('[data-hg]').forEach(b=>b.onclick=()=>g({user:b.dataset.hg,hat:q('hs',b.dataset.hg).value}));
+ app.querySelectorAll('[data-ht]').forEach(b=>b.onclick=()=>g({user:b.dataset.ht,hat:q('hs',b.dataset.ht).value,take:1}));
+ app.querySelectorAll('[data-ban]').forEach(b=>b.onclick=()=>g({user:b.dataset.ban,ban:+b.dataset.b}))}
 function servers(){const act=PL.filter(p=>p.at>Date.now()-60000),ok=DB&&RM;
  app.innerHTML=`<h2>Servers</h2>${ok?'<p class="mut">Join a server to play with other people live. Up to 10 players each.</p>':'<p class="mut">Could not reach the server. Reload the page.</p>'}${games().map(g=>`<h3>${esc(g.name)}</h3><div class='grid'>${[1,2,3].map(n=>{const id=g.id+'x'+n,ps=act.filter(p=>p.server==id);return `<div class='card'><b>Server ${n}</b><div class='mut' style='font-size:13px'>${ps.length}/10 players</div><div class='mut' style='font-size:12px;min-height:32px'>${ps.map(p=>esc(p.name)).join(', ')||'Empty'}</div><button class='pri' data-j='${id}' data-g='${g.id}' style='width:100%' ${ok&&ps.length<10?'':'disabled'}>${ps.length>=10?'Full':'Join'}</button></div>`}).join('')}</div>`).join('')}`;
  app.querySelectorAll('[data-j]').forEach(b=>b.onclick=()=>play(games().find(g=>g.id==b.dataset.g),b.dataset.j))}
